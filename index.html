@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#6366F1"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="FinanzApp"/>
+  <title>FinanzApp</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+  <!-- PANTALLA DE LOGIN -->
+  <div id="pantallaLogin" style="display:flex">
+    <div class="login-wrap">
+      <div class="login-logo">
+        <img src="icon-192.png" width="80" height="80" style="border-radius:20px"/>
+      </div>
+      <h1 class="login-titulo">FinanzApp</h1>
+      <p class="login-sub">Controla tus finanzas personales</p>
+      <button class="btn-google" onclick="loginGoogle()">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20"/>
+        Continuar con Google
+      </button>
+      <p class="login-footer">Tus datos se guardan de forma segura en la nube</p>
+    </div>
+  </div>
+
+  <!-- APP PRINCIPAL -->
+  <div id="appPrincipal" style="display:none">
+  <div class="phone">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="glow-circle"></div>
+      <div class="header-top">
+        <div>
+          <p class="label">Balance Total</p>
+          <h1 class="balance" id="balance">$0</h1>
+        </div>
+        <div class="avatar" id="avatarBtn" onclick="mostrarPerfil()">
+          <img id="fotoUsuario" src="icon-192.png" width="44" height="44"
+            style="border-radius:50%;object-fit:cover;display:none"/>
+          <span id="avatarEmoji" style="font-size:20px">👤</span>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="card ingreso-card">
+          <div class="card-title"><span class="arrow">↑</span> Ingresos</div>
+          <p class="card-monto" id="totalIngresos">$0</p>
+        </div>
+        <div class="card gasto-card">
+          <div class="card-title"><span class="arrow-red">↓</span> Gastos</div>
+          <p class="card-monto" id="totalGastos">$0</p>
+        </div>
+      </div>
+      <div class="ahorro-wrap">
+        <div class="ahorro-labels">
+          <span>Tasa de ahorro</span>
+          <span class="ahorro-pct" id="ahorroPct">0%</span>
+        </div>
+        <div class="barra-bg">
+          <div class="barra-fill" id="barraFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INICIO -->
+    <div class="contenido" id="pantallaInicio">
+      <p class="section-label">Categorias</p>
+      <div class="categorias" id="categorias"></div>
+      <div class="trans-header">
+        <p class="section-label">Recientes</p>
+        <span class="ver-todo" onclick="verTodas()">Ver todo</span>
+      </div>
+      <div class="lista" id="lista"></div>
+    </div>
+
+    <!-- REPORTES -->
+    <div class="contenido" id="pantallaReportes" style="display:none">
+      <p class="section-label" style="margin-bottom:20px">Resumen del mes</p>
+      <div class="cards" style="margin-bottom:20px">
+        <div class="card ingreso-card">
+          <div class="card-title"><span class="arrow">↑</span> Ingresos</div>
+          <p class="card-monto" id="rIngresos">$0</p>
+        </div>
+        <div class="card gasto-card">
+          <div class="card-title"><span class="arrow-red">↓</span> Gastos</div>
+          <p class="card-monto" id="rGastos">$0</p>
+        </div>
+      </div>
+      <div class="grafica-wrap">
+        <canvas id="graficaDona" width="200" height="200"></canvas>
+        <div class="dona-centro">
+          <p class="dona-label">Total gastos</p>
+          <p class="dona-monto" id="donaMonto">$0</p>
+        </div>
+      </div>
+      <p class="section-label" style="margin:20px 0 12px">Por categoria</p>
+      <div id="barrasCategorias"></div>
+    </div>
+
+    <!-- METAS -->
+    <div class="contenido" id="pantallaMetas" style="display:none">
+      <div class="trans-header">
+        <p class="section-label">Mis metas</p>
+        <span class="ver-todo" onclick="abrirModalMeta()">+ Nueva</span>
+      </div>
+      <div id="listaMetas"></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="contenido" id="pantallaConfig" style="display:none">
+      <p class="section-label" style="margin-bottom:20px">Configuracion</p>
+
+      <!-- Perfil -->
+      <div class="config-perfil">
+        <img id="configFoto" src="icon-192.png" width="56" height="56"
+          style="border-radius:50%;object-fit:cover"/>
+        <div>
+          <p id="configNombre" style="color:white;font-size:15px;font-weight:600"></p>
+          <p id="configEmail" style="color:rgba(255,255,255,0.4);font-size:12px"></p>
+        </div>
+      </div>
+
+      <div class="config-item">
+        <div class="config-info">
+          <p class="config-titulo">Moneda</p>
+          <p class="config-sub">Simbolo que aparece</p>
+        </div>
+        <select id="selectMoneda" class="config-select" onchange="guardarConfig()">
+          <option value="$">$ Peso</option>
+          <option value="USD">USD</option>
+          <option value="€">€ Euro</option>
+          <option value="S/">S/ Sol</option>
+          <option value="Bs">Bs Bolivar</option>
+        </select>
+      </div>
+
+      <div class="trans-header" style="margin-top:20px">
+        <p class="section-label">Mis categorias</p>
+        <span class="ver-todo" onclick="abrirModalCategoria()">+ Nueva</span>
+      </div>
+      <div id="listaCatsCustom"></div>
+
+      <div class="config-item" style="margin-top:16px">
+        <div class="config-info">
+          <p class="config-titulo">Borrar todos los datos</p>
+          <p class="config-sub">Elimina transacciones y metas</p>
+        </div>
+        <button class="config-btn-danger" onclick="borrarTodo()">Borrar</button>
+      </div>
+
+      <button class="btn-cerrar-sesion" onclick="cerrarSesion()">
+        Cerrar sesion
+      </button>
+
+      <div class="config-version">
+        <p>FinanzApp v1.0</p>
+        <p>Hecho con 💜</p>
+      </div>
+    </div>
+
+    <!-- VER TODAS -->
+    <div class="contenido" id="pantallaVerTodas" style="display:none">
+      <div class="trans-header">
+        <p class="section-label">Todas las transacciones</p>
+        <span class="ver-todo" onclick="mostrarPantalla('inicio'); setNavById(0)">← Volver</span>
+      </div>
+      <div class="lista" id="listaTodas"></div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <!-- FAB -->
+    <button class="fab" id="fab" onclick="abrirModal()">+</button>
+
+    <!-- NAV -->
+    <div class="nav">
+      <button class="nav-btn active" id="nav0" onclick="setNav(this); mostrarPantalla('inicio')">
+        <span>🏠</span><small>Inicio</small>
+      </button>
+      <button class="nav-btn" id="nav1" onclick="setNav(this); mostrarPantalla('reportes')">
+        <span>📊</span><small>Reportes</small>
+      </button>
+      <button class="nav-btn" id="nav2" onclick="setNav(this); mostrarPantalla('metas')">
+        <span>🎯</span><small>Metas</small>
+      </button>
+      <button class="nav-btn" id="nav3" onclick="setNav(this); mostrarPantalla('config')">
+        <span>⚙️</span><small>Config</small>
+      </button>
+    </div>
+
+  </div>
+  </div>
+
+  <!-- MODAL TRANSACCION -->
+  <div class="modal-overlay" id="modalOverlay" onclick="cerrarModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3 id="modalTitulo">Nueva transaccion</h3>
+      <div class="tipo-btns">
+        <button class="tipo-btn activo-gasto" id="btnGasto" onclick="setTipo('gasto')">💸 Gasto</button>
+        <button class="tipo-btn" id="btnIngreso" onclick="setTipo('ingreso')">💰 Ingreso</button>
+      </div>
+      <input id="inputDesc" type="text" placeholder="Descripcion" />
+      <input id="inputMonto" type="number" placeholder="Monto $" />
+      <div class="categorias-modal" id="categoriasModal"></div>
+      <button class="btn-agregar" onclick="agregarTransaccion()">Agregar</button>
+      <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- MODAL META -->
+  <div class="modal-overlay" id="modalMeta" onclick="cerrarModalMeta()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>Nueva meta de ahorro</h3>
+      <input id="inputMetaNombre" type="text" placeholder="Ej: Vacaciones, Auto, Celular" />
+      <input id="inputMetaObjetivo" type="number" placeholder="Monto objetivo $" />
+      <input id="inputMetaAhorrado" type="number" placeholder="Cuanto llevas ahorrado $" />
+      <button class="btn-agregar" onclick="agregarMeta()">Crear meta</button>
+      <button class="btn-cancelar" onclick="cerrarModalMeta()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- MODAL CATEGORIA CUSTOM -->
+  <div class="modal-overlay" id="modalCategoria" onclick="cerrarModalCategoria()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>Nueva categoria</h3>
+      <input id="inputCatNombre" type="text" placeholder="Nombre de la categoria" />
+      <p style="color:rgba(255,255,255,0.4);font-size:12px;margin:12px 0 6px">Elige un icono</p>
+      <div id="iconosPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+      <p style="color:rgba(255,255,255,0.4);font-size:12px;margin-bottom:8px">Elige un color</p>
+      <div id="coloresPicker" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+      <button class="btn-agregar" onclick="agregarCategoriaCustom()">Crear categoria</button>
+      <button class="btn-cancelar" onclick="cerrarModalCategoria()">Cancelar</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
