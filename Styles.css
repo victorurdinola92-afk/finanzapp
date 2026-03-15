@@ -478,9 +478,34 @@ body {
   border-radius: 14px;
   border: 1px solid rgba(239,68,68,0.3);
   background: rgba(239,68,68,0.08);
+  
   color: #EF4444;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   margin-top: 16px;
+}
+/* FILTROS */
+.filtros-wrap {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.filtro-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filtro-btn.activo {
+  background: rgba(99,102,241,0.2);
+  border-color: #6366F1;
+  color: #818CF8;
+  font-weight: 700;
 }
