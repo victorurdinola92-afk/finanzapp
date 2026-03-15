@@ -8,7 +8,6 @@ var firebaseConfig = {
   appId: "1:65628984681:web:3834a535a1edfe237b59f8"
 };
 
-// FIREBASE SDK
 var firebaseApp, auth, db, usuarioActual;
 
 function cargarFirebase(callback) {
@@ -22,8 +21,8 @@ function cargarFirebase(callback) {
       s3.src = "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js";
       s3.onload = function() {
         firebaseApp = firebase.initializeApp(firebaseConfig);
-        auth        = firebase.auth();
-        db          = firebase.firestore();
+        auth = firebase.auth();
+        db   = firebase.firestore();
         callback();
       };
       document.head.appendChild(s3);
@@ -33,7 +32,7 @@ function cargarFirebase(callback) {
   document.head.appendChild(s1);
 }
 
-// CATEGORIAS BASE
+// CATEGORIAS
 var categorias = {
   Salario:         { icon: "💼", color: "#51CF66" },
   Freelance:       { icon: "💻", color: "#20C997" },
@@ -67,6 +66,7 @@ var tipoSeleccionado      = "gasto";
 var editandoId            = null;
 var iconoCustom           = "🌟";
 var colorCustom           = "#6366F1";
+var filtroActivo          = "mes";
 
 // TOAST
 function mostrarToast(msg, error) {
@@ -76,7 +76,7 @@ function mostrarToast(msg, error) {
   setTimeout(function() { t.className = "toast"; }, 2500);
 }
 
-// LOGIN GOOGLE
+// LOGIN
 function loginGoogle() {
   var provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(function(e) {
@@ -94,32 +94,27 @@ function mostrarPerfil() {
   setNavById(3);
 }
 
-// FIRESTORE — CARGAR DATOS
+// FIRESTORE
 function cargarDatosNube() {
   var uid = usuarioActual.uid;
-
   db.collection("usuarios").doc(uid).collection("transacciones")
     .orderBy("timestamp", "desc").onSnapshot(function(snap) {
       transacciones = [];
       snap.forEach(function(doc) {
-        var d = doc.data();
-        d.id  = doc.id;
+        var d = doc.data(); d.id = doc.id;
         transacciones.push(d);
       });
       renderLista();
       actualizarTotales();
     });
-
   db.collection("usuarios").doc(uid).collection("metas")
     .onSnapshot(function(snap) {
       metas = [];
       snap.forEach(function(doc) {
-        var d = doc.data();
-        d.id  = doc.id;
+        var d = doc.data(); d.id = doc.id;
         metas.push(d);
       });
     });
-
   db.collection("usuarios").doc(uid).collection("config")
     .doc("preferencias").get().then(function(doc) {
       if (doc.exists) {
@@ -129,7 +124,7 @@ function cargarDatosNube() {
       }
     });
 }
-// FIRESTORE — GUARDAR
+
 function guardarTransaccionNube(t) {
   var uid = usuarioActual.uid;
   t.timestamp = firebase.firestore.FieldValue.serverTimestamp();
@@ -171,14 +166,52 @@ function guardarConfig() {
 
 function borrarTodo() {
   if (!confirm("Borrar todas las transacciones y metas?")) return;
-  var uid = usuarioActual.uid;
+  var uid   = usuarioActual.uid;
   var batch = db.batch();
   for (var i = 0; i < transacciones.length; i++) {
     var ref = db.collection("usuarios").doc(uid).collection("transacciones").doc(transacciones[i].id);
     batch.delete(ref);
   }
-  batch.commit().then(function() {
-    mostrarToast("Datos borrados");
+  batch.commit().then(function() { mostrarToast("Datos borrados"); });
+}
+// FILTROS
+function setFiltro(filtro) {
+  filtroActivo = filtro;
+  document.querySelectorAll(".filtro-btn").forEach(function(b) {
+    b.classList.remove("activo");
+  });
+  document.getElementById("filtro-" + filtro).classList.add("activo");
+  renderLista();
+  actualizarTotales();
+}
+
+function filtrarTransacciones() {
+  var hoy = new Date();
+  return transacciones.filter(function(t) {
+    if (!t.timestamp) return filtroActivo === "todo";
+    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
+    if (filtroActivo === "semana") {
+      var inicio = new Date(hoy);
+      inicio.setDate(hoy.getDate() - 7);
+      return fecha >= inicio;
+    } else if (filtroActivo === "mes") {
+      return fecha.getMonth() === hoy.getMonth() &&
+             fecha.getFullYear() === hoy.getFullYear();
+    } else if (filtroActivo === "año") {
+      return fecha.getFullYear() === hoy.getFullYear();
+    }
+    return true;
+  });
+}
+
+function filtrarSemanaAnterior() {
+  var hoy = new Date();
+  var inicioEsta     = new Date(hoy); inicioEsta.setDate(hoy.getDate() - 7);
+  var inicioAnterior = new Date(hoy); inicioAnterior.setDate(hoy.getDate() - 14);
+  return transacciones.filter(function(t) {
+    if (!t.timestamp) return false;
+    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
+    return fecha >= inicioAnterior && fecha < inicioEsta;
   });
 }
 
@@ -229,48 +262,21 @@ function renderCategoriasModal() {
 function seleccionarCat(n) { categoriaSeleccionada = n; renderCategorias(); }
 function seleccionarCatModal(n) { categoriaSeleccionada = n; renderCategoriasModal(); }
 
-// RENDER LISTA
-// FILTROS DE TIEMPO
-var filtroActivo = "mes";
-
-function setFiltro(filtro) {
-  filtroActivo = filtro;
-  document.querySelectorAll(".filtro-btn").forEach(function(b) {
-    b.classList.remove("activo");
-  });
-  document.getElementById("filtro-" + filtro).classList.add("activo");
-  renderLista();
-  actualizarTotales();
-}
-
-function filtrarTransacciones() {
-  var hoy = new Date();
-  return transacciones.filter(function(t) {
-    if (!t.timestamp) return true;
-    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.fecha);
-    if (filtroActivo === "semana") {
-      var inicio = new Date(hoy);
-      inicio.setDate(hoy.getDate() - 7);
-      return fecha >= inicio;
-    } else if (filtroActivo === "mes") {
-      return fecha.getMonth() === hoy.getMonth() &&
-             fecha.getFullYear() === hoy.getFullYear();
-    } else if (filtroActivo === "año") {
-      return fecha.getFullYear() === hoy.getFullYear();
-    }
-    return true;
-  });
-}
-
-function filtrarSemanaAnterior() {
-  var hoy = new Date();
-  var inicioEsta = new Date(hoy); inicioEsta.setDate(hoy.getDate() - 7);
-  var inicioAnterior = new Date(hoy); inicioAnterior.setDate(hoy.getDate() - 14);
-  return transacciones.filter(function(t) {
-    if (!t.timestamp) return false;
-    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.fecha);
-    return fecha >= inicioAnterior && fecha < inicioEsta;
-  });
+// LISTA
+function crearItemHTML(t) {
+  var todas = getCategorias();
+  var cat   = todas[t.categoria] || { icon: "💰", color: "#6366F1" };
+  var signo = t.type === "ingreso" ? "+" : "-";
+  var clase = t.type === "ingreso" ? "monto-ingreso" : "monto-gasto";
+  return '<div class="trans-item" onclick="editarTransaccion(\'' + t.id + '\')">' +
+    '<div class="trans-icon" style="background:' + cat.color + '22">' + cat.icon + '</div>' +
+    '<div class="trans-info">' +
+      '<p class="trans-desc">' + t.descripcion + '</p>' +
+      '<p class="trans-meta">' + t.categoria + ' - ' + t.fecha + '</p>' +
+    '</div>' +
+    '<span class="trans-monto ' + clase + '">' + signo + '$' + t.monto.toLocaleString() + '</span>' +
+    '<button class="btn-eliminar" onclick="eliminarTransaccion(event,\'' + t.id + '\')">🗑️</button>' +
+  '</div>';
 }
 
 function renderLista() {
@@ -284,46 +290,25 @@ function renderLista() {
     return;
   }
   var limite = filtradas.length > 5 ? 5 : filtradas.length;
-  for (var i = 0; i < limite; i++) {
-    lista.innerHTML += crearItemHTML(filtradas[i]);
-  }
+  for (var i = 0; i < limite; i++) lista.innerHTML += crearItemHTML(filtradas[i]);
 }
 
 function verTodas() {
   var lista = document.getElementById("listaTodas");
   lista.innerHTML = "";
   var filtradas = filtrarTransacciones();
-  for (var i = 0; i < filtradas.length; i++) {
-    lista.innerHTML += crearItemHTML(filtradas[i]);
-  }
+  for (var i = 0; i < filtradas.length; i++) lista.innerHTML += crearItemHTML(filtradas[i]);
   mostrarPantalla("vertodas");
-  document.querySelectorAll(".nav-btn").forEach(function(b) {
-    b.classList.remove("active");
-  });
+  document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("active"); });
 }
 
+// TOTALES
 function actualizarTotales() {
   var filtradas = filtrarTransacciones();
   var ingresos = 0; var gastos = 0;
   for (var i = 0; i < filtradas.length; i++) {
     if (filtradas[i].type === "ingreso") ingresos += filtradas[i].monto;
     else gastos += filtradas[i].monto;
-  }
-  var balance = ingresos - gastos;
-  var pct     = ingresos > 0 ? Math.round((balance / ingresos) * 100) : 0;
-  document.getElementById("balance").textContent       = "$" + balance.toLocaleString();
-  document.getElementById("totalIngresos").textContent = "$" + ingresos.toLocaleString();
-  document.getElementById("totalGastos").textContent   = "$" + gastos.toLocaleString();
-  document.getElementById("ahorroPct").textContent     = pct + "%";
-  document.getElementById("barraFill").style.width     = (pct < 0 ? 0 : pct) + "%";
-}
-
-// TOTALES
-function actualizarTotales() {
-  var ingresos = 0; var gastos = 0;
-  for (var i = 0; i < transacciones.length; i++) {
-    if (transacciones[i].type === "ingreso") ingresos += transacciones[i].monto;
-    else gastos += transacciones[i].monto;
   }
   var balance = ingresos - gastos;
   var pct     = ingresos > 0 ? Math.round((balance / ingresos) * 100) : 0;
@@ -385,25 +370,11 @@ function agregarTransaccion() {
   var desc  = document.getElementById("inputDesc").value.trim();
   var monto = parseFloat(document.getElementById("inputMonto").value);
   if (!desc || !monto || monto <= 0) { mostrarToast("Completa todos los campos", true); return; }
-
   var hoy   = new Date();
   var fecha = hoy.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
-
-  var t = {
-    type: tipoSeleccionado,
-    categoria: categoriaSeleccionada,
-    descripcion: desc,
-    monto: monto,
-    fecha: fecha
-  };
-
-  if (editandoId) {
-    t.id = editandoId;
-    mostrarToast("Transaccion actualizada");
-  } else {
-    mostrarToast("Guardado");
-  }
-
+  var t = { type: tipoSeleccionado, categoria: categoriaSeleccionada, descripcion: desc, monto: monto, fecha: fecha };
+  if (editandoId) { t.id = editandoId; mostrarToast("Actualizado"); }
+  else mostrarToast("Guardado");
   guardarTransaccionNube(t);
   cerrarModal();
 }
@@ -415,10 +386,7 @@ function abrirModalMeta() {
   document.getElementById("inputMetaAhorrado").value = "";
   document.getElementById("modalMeta").classList.add("show");
 }
-
-function cerrarModalMeta() {
-  document.getElementById("modalMeta").classList.remove("show");
-}
+function cerrarModalMeta() { document.getElementById("modalMeta").classList.remove("show"); }
 
 function agregarMeta() {
   var nombre   = document.getElementById("inputMetaNombre").value.trim();
@@ -455,13 +423,12 @@ function renderMetas() {
   lista.innerHTML = "";
   if (metas.length === 0) {
     lista.innerHTML = '<div style="text-align:center;padding:40px 0;color:rgba(255,255,255,0.2)">' +
-      '<p style="font-size:32px">🎯</p>' +
-      '<p style="font-size:13px;margin-top:8px">Sin metas aun. Crea una!</p></div>';
+      '<p style="font-size:32px">🎯</p><p style="font-size:13px;margin-top:8px">Sin metas aun</p></div>';
     return;
   }
   for (var i = 0; i < metas.length; i++) {
-    var m    = metas[i];
-    var pct  = Math.round((m.ahorrado / m.objetivo) * 100);
+    var m = metas[i];
+    var pct = Math.round((m.ahorrado / m.objetivo) * 100);
     var llena = pct >= 100;
     lista.innerHTML += '<div class="meta-item">' +
       '<div class="meta-header">' +
@@ -470,11 +437,9 @@ function renderMetas() {
       '</div>' +
       '<p class="meta-montos">Ahorrado: <span>$' + m.ahorrado.toLocaleString() + '</span> de $' + m.objetivo.toLocaleString() + '</p>' +
       '<div class="meta-barra-bg"><div class="meta-barra-fill ' + (llena ? "completa" : "") + '" style="width:' + (pct > 100 ? 100 : pct) + '%"></div></div>' +
-      '<div class="meta-pct">' +
-        '<span class="' + (llena ? "completo" : "") + '">' + (llena ? "Meta cumplida!" : pct + "% completado") + '</span>' +
-        (llena ? "" : '<button style="background:rgba(99,102,241,0.2);border:none;color:#818CF8;border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="abonarMeta(\'' + m.id + '\')">+ Abonar</button>') +
-      '</div>' +
-    '</div>';
+      '<div class="meta-pct"><span class="' + (llena ? "completo" : "") + '">' + (llena ? "Meta cumplida!" : pct + "% completado") + '</span>' +
+      (llena ? "" : '<button style="background:rgba(99,102,241,0.2);border:none;color:#818CF8;border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="abonarMeta(\'' + m.id + '\')">+ Abonar</button>') +
+      '</div></div>';
   }
 }
 // CATEGORIAS CUSTOM
@@ -550,7 +515,11 @@ function renderCategoriasConfig() {
 }
 
 // REPORTES
-= filtradas[i].monto;
+function renderReportes() {
+  var filtradas = filtrarTransacciones();
+  var ingresos = 0; var gastos = 0;
+  for (var i = 0; i < filtradas.length; i++) {
+    if (filtradas[i].type === "ingreso") ingresos += filtradas[i].monto;
     else gastos += filtradas[i].monto;
   }
   document.getElementById("rIngresos").textContent = "$" + ingresos.toLocaleString();
@@ -563,7 +532,7 @@ function renderCategoriasConfig() {
   for (var i = 0; i < anterior.length; i++) {
     if (anterior[i].type === "gasto") gastosAnt += anterior[i].monto;
   }
-  var diff = gastos - gastosAnt;
+  var diff    = gastos - gastosAnt;
   var diffPct = gastosAnt > 0 ? Math.round((diff / gastosAnt) * 100) : 0;
   var comparEl = document.getElementById("comparativa");
   if (comparEl) {
@@ -572,14 +541,12 @@ function renderCategoriasConfig() {
     comparEl.innerHTML = '<div style="background:rgba(255,255,255,0.04);border-radius:14px;padding:12px 16px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">' +
       '<p style="color:rgba(255,255,255,0.4);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">vs semana anterior</p>' +
       '<p style="color:' + color + ';font-size:20px;font-weight:700">' + icono + ' ' + Math.abs(diffPct) + '%</p>' +
-      '<p style="color:rgba(255,255,255,0.3);font-size:12px">' + (diff > 0 ? "Gastaste más que la semana pasada" : "Gastaste menos que la semana pasada") + '</p>' +
+      '<p style="color:rgba(255,255,255,0.3);font-size:12px">' + (diff > 0 ? "Gastaste mas que la semana pasada" : "Gastaste menos que la semana pasada") + '</p>' +
     '</div>';
   }
 
-  // Grafica por meses
   renderGraficaMeses();
 
-  // Dona
   var porCategoria = {};
   for (var i = 0; i < filtradas.length; i++) {
     var t = filtradas[i];
@@ -616,49 +583,64 @@ function renderGraficaMeses() {
   if (!canvas) return;
   var ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   var meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-  var hoy = new Date();
+  var hoy   = new Date();
   var datos = [];
-
   for (var m = 0; m < 12; m++) {
     var total = 0;
     for (var i = 0; i < transacciones.length; i++) {
       var t = transacciones[i];
-      if (t.type !== "gasto") continue;
-      if (!t.timestamp) continue;
+      if (t.type !== "gasto" || !t.timestamp) continue;
       var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
-      if (fecha.getMonth() === m && fecha.getFullYear() === hoy.getFullYear()) {
-        total += t.monto;
-      }
+      if (fecha.getMonth() === m && fecha.getFullYear() === hoy.getFullYear()) total += t.monto;
     }
     datos.push(total);
   }
-
-  var max = Math.max.apply(null, datos) || 1;
-  var w   = canvas.width;
-  var h   = canvas.height;
+  var max  = Math.max.apply(null, datos) || 1;
+  var w    = canvas.width;
+  var h    = canvas.height;
   var barW = w / 12 - 4;
-
   for (var m = 0; m < 12; m++) {
-    var barH  = (datos[m] / max) * (h - 30);
-    var x     = m * (w / 12) + 2;
-    var y     = h - barH - 20;
+    var barH   = (datos[m] / max) * (h - 30);
+    var x      = m * (w / 12) + 2;
+    var y      = h - barH - 20;
     var activo = m === hoy.getMonth();
-
     ctx.fillStyle = activo ? "#6366F1" : "rgba(99,102,241,0.3)";
     ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x, y, barW, barH, 4) : ctx.rect(x, y, barW, barH);
+    if (ctx.roundRect) { ctx.roundRect(x, y, barW, barH, 4); } else { ctx.rect(x, y, barW, barH); }
     ctx.fill();
-
-    ctx.fillStyle = activo ? "white" : "rgba(255,255,255,0.3)";
-    ctx.font = "9px sans-serif";
-    ctx.textAlign = "center";
+    ctx.fillStyle  = activo ? "white" : "rgba(255,255,255,0.3)";
+    ctx.font       = "9px sans-serif";
+    ctx.textAlign  = "center";
     ctx.fillText(meses[m], x + barW / 2, h - 4);
   }
 }
 
-// EXPORTAR PDF
+function dibujarDona(datos) {
+  var canvas = document.getElementById("graficaDona");
+  var ctx    = canvas.getContext("2d");
+  var cx = canvas.width / 2; var cy = canvas.height / 2;
+  var radio = 80; var grosor = 28;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (datos.length === 0) {
+    ctx.beginPath(); ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = grosor; ctx.stroke(); return;
+  }
+  var total = 0;
+  for (var i = 0; i < datos.length; i++) total += datos[i][1];
+  var angulo = -Math.PI / 2;
+  var todas  = getCategorias();
+  for (var i = 0; i < datos.length; i++) {
+    var cat   = todas[datos[i][0]] || { color: "#6366F1" };
+    var slice = (datos[i][1] / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.arc(cx, cy, radio, angulo, angulo + slice);
+    ctx.strokeStyle = cat.color; ctx.lineWidth = grosor; ctx.lineCap = "butt"; ctx.stroke();
+    angulo += slice;
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, radio - grosor / 2, 0, Math.PI * 2);
+  ctx.fillStyle = "#0D0D1A"; ctx.fill();
+    }
+// EXPORTAR
 function exportarPDF() {
   var filtradas = filtrarTransacciones();
   var ingresos = 0; var gastos = 0;
@@ -666,9 +648,8 @@ function exportarPDF() {
     if (filtradas[i].type === "ingreso") ingresos += filtradas[i].monto;
     else gastos += filtradas[i].monto;
   }
-
   var periodos = { semana: "Esta semana", mes: "Este mes", año: "Este año", todo: "Todo el historial" };
-  var contenido = "FinanzApp - Reporte " + periodos[filtroActivo] + "\n";
+  var contenido = "FinanzApp - Reporte " + (periodos[filtroActivo] || "General") + "\n";
   contenido += "================================\n";
   contenido += "Ingresos: $" + ingresos.toLocaleString() + "\n";
   contenido += "Gastos:   $" + gastos.toLocaleString() + "\n";
@@ -677,19 +658,16 @@ function exportarPDF() {
   contenido += "TRANSACCIONES\n";
   for (var i = 0; i < filtradas.length; i++) {
     var t = filtradas[i];
-    var signo = t.type === "ingreso" ? "+" : "-";
-    contenido += signo + "$" + t.monto.toLocaleString() + " | " + t.descripcion + " | " + t.categoria + " | " + t.fecha + "\n";
+    contenido += (t.type === "ingreso" ? "+" : "-") + "$" + t.monto.toLocaleString() +
+      " | " + t.descripcion + " | " + t.categoria + " | " + t.fecha + "\n";
   }
-
   var blob = new Blob([contenido], { type: "text/plain" });
   var url  = URL.createObjectURL(blob);
   var a    = document.createElement("a");
-  a.href     = url;
-  a.download = "reporte-finanzapp-" + filtroActivo + ".txt";
-  a.click();
+  a.href = url; a.download = "reporte-finanzapp.txt"; a.click();
   URL.revokeObjectURL(url);
   mostrarToast("Reporte exportado");
-      }
+}
 
 // NAVEGACION
 function mostrarPantalla(nombre) {
@@ -710,9 +688,7 @@ function mostrarPantalla(nombre) {
     if (usuarioActual) {
       document.getElementById("configNombre").textContent = usuarioActual.displayName || "Usuario";
       document.getElementById("configEmail").textContent  = usuarioActual.email || "";
-      if (usuarioActual.photoURL) {
-        document.getElementById("configFoto").src = usuarioActual.photoURL;
-      }
+      if (usuarioActual.photoURL) document.getElementById("configFoto").src = usuarioActual.photoURL;
     }
   } else if (nombre === "vertodas") {
     document.getElementById("pantallaVerTodas").style.display = "block"; fab.style.display = "none";
@@ -729,6 +705,7 @@ function setNavById(index) {
   var btn = document.getElementById("nav" + index);
   if (btn) btn.classList.add("active");
 }
+
 // INICIALIZAR
 cargarFirebase(function() {
   auth.onAuthStateChanged(function(usuario) {
@@ -736,21 +713,17 @@ cargarFirebase(function() {
       usuarioActual = usuario;
       document.getElementById("pantallaLogin").style.display  = "none";
       document.getElementById("appPrincipal").style.display   = "block";
-
-      // Foto en avatar
       if (usuario.photoURL) {
-        document.getElementById("fotoUsuario").src     = usuario.photoURL;
-        document.getElementById("fotoUsuario").style.display = "block";
-        document.getElementById("avatarEmoji").style.display = "none";
+        document.getElementById("fotoUsuario").src             = usuario.photoURL;
+        document.getElementById("fotoUsuario").style.display   = "block";
+        document.getElementById("avatarEmoji").style.display   = "none";
       }
-
       cargarDatosNube();
       renderCategorias();
-
     } else {
       usuarioActual = null;
       document.getElementById("pantallaLogin").style.display  = "flex";
       document.getElementById("appPrincipal").style.display   = "none";
     }
   });
-});
+});      
