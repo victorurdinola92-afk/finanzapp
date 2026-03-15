@@ -79,7 +79,14 @@
       </div>
       <div class="lista" id="lista"></div>
     </div>
-
+<!-- FILTROS -->
+<div class="filtros-wrap">
+  <button class="filtro-btn" id="filtro-semana" onclick="setFiltro('semana')">Semana</button>
+  <button class="filtro-btn activo" id="filtro-mes" onclick="setFiltro('mes')">Mes</button>
+  <button class="filtro-btn" id="filtro-año" onclick="setFiltro('año')">Año</button>
+  <button class="filtro-btn" id="filtro-todo" onclick="setFiltro('todo')">Todo</button>
+</div>
+    
     <!-- REPORTES -->
     <div class="contenido" id="pantallaReportes" style="display:none">
       <p class="section-label" style="margin-bottom:20px">Resumen del mes</p>
@@ -103,6 +110,19 @@
       <p class="section-label" style="margin:20px 0 12px">Por categoria</p>
       <div id="barrasCategorias"></div>
     </div>
+    <!-- COMPARATIVA -->
+<div id="comparativa"></div>
+
+<!-- GRAFICA MESES -->
+<p class="section-label" style="margin-bottom:12px">Gastos por mes</p>
+<div style="background:rgba(255,255,255,0.04);border-radius:16px;padding:16px;margin-bottom:20px">
+  <canvas id="graficaMeses" width="300" height="120"></canvas>
+</div>
+
+<!-- EXPORTAR -->
+<button onclick="exportarPDF()" style="width:100%;padding:12px;border-radius:14px;border:1px solid rgba(99,102,241,0.4);background:rgba(99,102,241,0.1);color:#818CF8;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:20px">
+  📄 Exportar reporte
+</button>
 
     <!-- METAS -->
     <div class="contenido" id="pantallaMetas" style="display:none">
