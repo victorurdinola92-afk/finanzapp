@@ -544,6 +544,144 @@ function renderReportes() {
       '<p style="color:rgba(255,255,255,0.3);font-size:12px">' + (diff > 0 ? "Gastaste mas que la semana pasada" : "Gastaste menos que la semana pasada") + '</p>' +
     '</div>';
   }
+  function renderGraficaIngVsGas() {
+  var canvas = document.getElementById("graficaIngVsGas");
+  if (!canvas) return;
+  var ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  var meses  = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  var hoy    = new Date();
+  var ing    = []; var gas = [];
+
+  for (var m = 0; m < 12; m++) {
+    var totalIng = 0; var totalGas = 0;
+    for (var i = 0; i < transacciones.length; i++) {
+      var t = transacciones[i];
+      if (!t.timestamp) continue;
+      var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
+      if (fecha.getMonth() === m && fecha.getFullYear() === hoy.getFullYear()) {
+        if (t.type === "ingreso") totalIng += t.monto;
+        else totalGas += t.monto;
+      }
+    }
+    ing.push(totalIng);
+    gas.push(totalGas);
+  }
+
+  var max  = Math.max.apply(null, ing.concat(gas)) || 1;
+  var w    = canvas.width;
+  var h    = canvas.height;
+  var barW = (w / 12) / 2 - 2;
+
+  for (var m = 0; m < 12; m++) {
+    var x      = m * (w / 12) + 2;
+    var activo = m === hoy.getMonth();
+
+    // Barra ingresos
+    var barHIng = (ing[m] / max) * (h - 30);
+    ctx.fillStyle = activo ? "#10B981" : "rgba(16,185,129,0.3)";
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, h - barHIng - 20, barW, barHIng, 3);
+    } else {
+      ctx.rect(x, h - barHIng - 20, barW, barHIng);
+    }
+    ctx.fill();
+
+    // Barra gastos
+    var barHGas = (gas[m] / max) * (h - 30);
+    ctx.fillStyle = activo ? "#EF4444" : "rgba(239,68,68,0.3)";
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x + barW + 2, h - barHGas - 20, barW, barHGas, 3);
+    } else {
+      ctx.rect(x + barW + 2, h - barHGas - 20, barW, barHGas);
+    }
+    ctx.fill();
+
+    // Label mes
+    ctx.fillStyle  = activo ? "white" : "rgba(255,255,255,0.3)";
+    ctx.font       = "8px sans-serif";
+    ctx.textAlign  = "center";
+    ctx.fillText(meses[m], x + barW, h - 4);
+  }
+
+  // Leyenda
+  ctx.fillStyle = "#10B981";
+  ctx.fillRect(8, 8, 10, 10);
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Ingresos", 22, 17);
+
+  ctx.fillStyle = "#EF4444";
+  ctx.fillRect(90, 8, 10, 10);
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText("Gastos", 104, 17);
+}
+
+function renderProyeccion() {
+  var wrap = document.getElementById("proyeccion");
+  if (!wrap) return;
+
+  var hoy    = new Date();
+  var mesAct = hoy.getMonth();
+  var diasMes   = new Date(hoy.getFullYear(), mesAct + 1, 0).getDate();
+  var diaActual = hoy.getDate();
+
+  // Gastos del mes actual
+  var gastosMes = 0;
+  for (var i = 0; i < transacciones.length; i++) {
+    var t = transacciones[i];
+    if (t.type !== "gasto" || !t.timestamp) continue;
+    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
+    if (fecha.getMonth() === mesAct && fecha.getFullYear() === hoy.getFullYear()) {
+      gastosMes += t.monto;
+    }
+  }
+
+  // Proyeccion al final del mes
+  var proyectado = diaActual > 0 ? Math.round((gastosMes / diaActual) * diasMes) : 0;
+  var diasRestantes = diasMes - diaActual;
+
+  // Ingresos del mes
+  var ingresosMes = 0;
+  for (var i = 0; i < transacciones.length; i++) {
+    var t = transacciones[i];
+    if (t.type !== "ingreso" || !t.timestamp) continue;
+    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
+    if (fecha.getMonth() === mesAct && fecha.getFullYear() === hoy.getFullYear()) {
+      ingresosMes += t.monto;
+    }
+  }
+
+  var ahorroProyectado = ingresosMes - proyectado;
+  var colorAhorro = ahorroProyectado >= 0 ? "#10B981" : "#EF4444";
+  var iconoAhorro = ahorroProyectado >= 0 ? "📈" : "📉";
+
+  wrap.innerHTML =
+    '<div style="background:rgba(255,255,255,0.04);border-radius:16px;padding:16px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.06)">' +
+      '<p style="color:rgba(255,255,255,0.4);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">' + iconoAhorro + ' Proyeccion del mes</p>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:8px">' +
+        '<span style="color:rgba(255,255,255,0.5);font-size:13px">Gastas por dia</span>' +
+        '<span style="color:white;font-weight:600">$' + Math.round(gastosMes / (diaActual || 1)).toLocaleString() + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:8px">' +
+        '<span style="color:rgba(255,255,255,0.5);font-size:13px">Proyeccion al fin del mes</span>' +
+        '<span style="color:#EF4444;font-weight:600">$' + proyectado.toLocaleString() + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:8px">' +
+        '<span style="color:rgba(255,255,255,0.5);font-size:13px">Dias restantes</span>' +
+        '<span style="color:white;font-weight:600">' + diasRestantes + ' dias</span>' +
+      '</div>' +
+      '<div style="height:1px;background:rgba(255,255,255,0.06);margin:10px 0"></div>' +
+      '<div style="display:flex;justify-content:space-between">' +
+        '<span style="color:rgba(255,255,255,0.5);font-size:13px">Ahorro proyectado</span>' +
+        '<span style="color:' + colorAhorro + ';font-weight:700;font-size:16px">$' + Math.abs(ahorroProyectado).toLocaleString() + '</span>' +
+      '</div>' +
+    '</div>';
+}
 
   renderGraficaMeses();
 
