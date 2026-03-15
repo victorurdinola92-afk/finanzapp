@@ -230,42 +230,94 @@ function seleccionarCat(n) { categoriaSeleccionada = n; renderCategorias(); }
 function seleccionarCatModal(n) { categoriaSeleccionada = n; renderCategoriasModal(); }
 
 // RENDER LISTA
-function crearItemHTML(t) {
-  var todas = getCategorias();
-  var cat   = todas[t.categoria] || { icon: "💰", color: "#6366F1" };
-  var signo = t.type === "ingreso" ? "+" : "-";
-  var clase = t.type === "ingreso" ? "monto-ingreso" : "monto-gasto";
-  return '<div class="trans-item" onclick="editarTransaccion(\'' + t.id + '\')">' +
-    '<div class="trans-icon" style="background:' + cat.color + '22">' + cat.icon + '</div>' +
-    '<div class="trans-info">' +
-      '<p class="trans-desc">' + t.descripcion + '</p>' +
-      '<p class="trans-meta">' + t.categoria + ' - ' + t.fecha + '</p>' +
-    '</div>' +
-    '<span class="trans-monto ' + clase + '">' + signo + '$' + t.monto.toLocaleString() + '</span>' +
-    '<button class="btn-eliminar" onclick="eliminarTransaccion(event,\'' + t.id + '\')">🗑️</button>' +
-  '</div>';
+// FILTROS DE TIEMPO
+var filtroActivo = "mes";
+
+function setFiltro(filtro) {
+  filtroActivo = filtro;
+  document.querySelectorAll(".filtro-btn").forEach(function(b) {
+    b.classList.remove("activo");
+  });
+  document.getElementById("filtro-" + filtro).classList.add("activo");
+  renderLista();
+  actualizarTotales();
+}
+
+function filtrarTransacciones() {
+  var hoy = new Date();
+  return transacciones.filter(function(t) {
+    if (!t.timestamp) return true;
+    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.fecha);
+    if (filtroActivo === "semana") {
+      var inicio = new Date(hoy);
+      inicio.setDate(hoy.getDate() - 7);
+      return fecha >= inicio;
+    } else if (filtroActivo === "mes") {
+      return fecha.getMonth() === hoy.getMonth() &&
+             fecha.getFullYear() === hoy.getFullYear();
+    } else if (filtroActivo === "año") {
+      return fecha.getFullYear() === hoy.getFullYear();
+    }
+    return true;
+  });
+}
+
+function filtrarSemanaAnterior() {
+  var hoy = new Date();
+  var inicioEsta = new Date(hoy); inicioEsta.setDate(hoy.getDate() - 7);
+  var inicioAnterior = new Date(hoy); inicioAnterior.setDate(hoy.getDate() - 14);
+  return transacciones.filter(function(t) {
+    if (!t.timestamp) return false;
+    var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.fecha);
+    return fecha >= inicioAnterior && fecha < inicioEsta;
+  });
 }
 
 function renderLista() {
   var lista = document.getElementById("lista");
   lista.innerHTML = "";
-  if (transacciones.length === 0) {
+  var filtradas = filtrarTransacciones();
+  if (filtradas.length === 0) {
     lista.innerHTML = '<div style="text-align:center;padding:40px 0;color:rgba(255,255,255,0.2)">' +
       '<p style="font-size:32px">📭</p>' +
-      '<p style="font-size:13px;margin-top:8px">Sin transacciones aun</p></div>';
+      '<p style="font-size:13px;margin-top:8px">Sin transacciones en este periodo</p></div>';
     return;
   }
-  var limite = transacciones.length > 5 ? 5 : transacciones.length;
-  for (var i = 0; i < limite; i++) lista.innerHTML += crearItemHTML(transacciones[i]);
+  var limite = filtradas.length > 5 ? 5 : filtradas.length;
+  for (var i = 0; i < limite; i++) {
+    lista.innerHTML += crearItemHTML(filtradas[i]);
+  }
 }
 
 function verTodas() {
   var lista = document.getElementById("listaTodas");
   lista.innerHTML = "";
-  for (var i = 0; i < transacciones.length; i++) lista.innerHTML += crearItemHTML(transacciones[i]);
+  var filtradas = filtrarTransacciones();
+  for (var i = 0; i < filtradas.length; i++) {
+    lista.innerHTML += crearItemHTML(filtradas[i]);
+  }
   mostrarPantalla("vertodas");
-  document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("active"); });
+  document.querySelectorAll(".nav-btn").forEach(function(b) {
+    b.classList.remove("active");
+  });
 }
+
+function actualizarTotales() {
+  var filtradas = filtrarTransacciones();
+  var ingresos = 0; var gastos = 0;
+  for (var i = 0; i < filtradas.length; i++) {
+    if (filtradas[i].type === "ingreso") ingresos += filtradas[i].monto;
+    else gastos += filtradas[i].monto;
+  }
+  var balance = ingresos - gastos;
+  var pct     = ingresos > 0 ? Math.round((balance / ingresos) * 100) : 0;
+  document.getElementById("balance").textContent       = "$" + balance.toLocaleString();
+  document.getElementById("totalIngresos").textContent = "$" + ingresos.toLocaleString();
+  document.getElementById("totalGastos").textContent   = "$" + gastos.toLocaleString();
+  document.getElementById("ahorroPct").textContent     = pct + "%";
+  document.getElementById("barraFill").style.width     = (pct < 0 ? 0 : pct) + "%";
+}
+
 // TOTALES
 function actualizarTotales() {
   var ingresos = 0; var gastos = 0;
@@ -498,19 +550,39 @@ function renderCategoriasConfig() {
 }
 
 // REPORTES
-function renderReportes() {
-  var ingresos = 0; var gastos = 0;
-  for (var i = 0; i < transacciones.length; i++) {
-    if (transacciones[i].type === "ingreso") ingresos += transacciones[i].monto;
-    else gastos += transacciones[i].monto;
+= filtradas[i].monto;
+    else gastos += filtradas[i].monto;
   }
   document.getElementById("rIngresos").textContent = "$" + ingresos.toLocaleString();
   document.getElementById("rGastos").textContent   = "$" + gastos.toLocaleString();
   document.getElementById("donaMonto").textContent = "$" + gastos.toLocaleString();
 
+  // Comparativa semana anterior
+  var anterior = filtrarSemanaAnterior();
+  var gastosAnt = 0;
+  for (var i = 0; i < anterior.length; i++) {
+    if (anterior[i].type === "gasto") gastosAnt += anterior[i].monto;
+  }
+  var diff = gastos - gastosAnt;
+  var diffPct = gastosAnt > 0 ? Math.round((diff / gastosAnt) * 100) : 0;
+  var comparEl = document.getElementById("comparativa");
+  if (comparEl) {
+    var color = diff > 0 ? "#EF4444" : "#10B981";
+    var icono = diff > 0 ? "↑" : "↓";
+    comparEl.innerHTML = '<div style="background:rgba(255,255,255,0.04);border-radius:14px;padding:12px 16px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">' +
+      '<p style="color:rgba(255,255,255,0.4);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">vs semana anterior</p>' +
+      '<p style="color:' + color + ';font-size:20px;font-weight:700">' + icono + ' ' + Math.abs(diffPct) + '%</p>' +
+      '<p style="color:rgba(255,255,255,0.3);font-size:12px">' + (diff > 0 ? "Gastaste más que la semana pasada" : "Gastaste menos que la semana pasada") + '</p>' +
+    '</div>';
+  }
+
+  // Grafica por meses
+  renderGraficaMeses();
+
+  // Dona
   var porCategoria = {};
-  for (var i = 0; i < transacciones.length; i++) {
-    var t = transacciones[i];
+  for (var i = 0; i < filtradas.length; i++) {
+    var t = filtradas[i];
     if (t.type === "gasto") porCategoria[t.categoria] = (porCategoria[t.categoria] || 0) + t.monto;
   }
   var ordenado = [];
@@ -522,7 +594,7 @@ function renderReportes() {
   var wrap = document.getElementById("barrasCategorias");
   wrap.innerHTML = "";
   if (ordenado.length === 0) {
-    wrap.innerHTML = '<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,0.2)"><p style="font-size:28px">📊</p><p style="font-size:13px;margin-top:8px">Sin gastos registrados</p></div>';
+    wrap.innerHTML = '<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,0.2)"><p style="font-size:28px">📊</p><p style="font-size:13px;margin-top:8px">Sin gastos en este periodo</p></div>';
     return;
   }
   var todas = getCategorias();
@@ -539,30 +611,85 @@ function renderReportes() {
   }
 }
 
-function dibujarDona(datos) {
-  var canvas = document.getElementById("graficaDona");
+function renderGraficaMeses() {
+  var canvas = document.getElementById("graficaMeses");
+  if (!canvas) return;
   var ctx = canvas.getContext("2d");
-  var cx = canvas.width / 2; var cy = canvas.height / 2;
-  var radio = 80; var grosor = 28;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (datos.length === 0) {
-    ctx.beginPath(); ctx.arc(cx, cy, radio, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = grosor; ctx.stroke(); return;
+
+  var meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  var hoy = new Date();
+  var datos = [];
+
+  for (var m = 0; m < 12; m++) {
+    var total = 0;
+    for (var i = 0; i < transacciones.length; i++) {
+      var t = transacciones[i];
+      if (t.type !== "gasto") continue;
+      if (!t.timestamp) continue;
+      var fecha = t.timestamp.toDate ? t.timestamp.toDate() : new Date();
+      if (fecha.getMonth() === m && fecha.getFullYear() === hoy.getFullYear()) {
+        total += t.monto;
+      }
+    }
+    datos.push(total);
   }
-  var total = 0;
-  for (var i = 0; i < datos.length; i++) total += datos[i][1];
-  var angulo = -Math.PI / 2;
-  var todas  = getCategorias();
-  for (var i = 0; i < datos.length; i++) {
-    var cat   = todas[datos[i][0]] || { color: "#6366F1" };
-    var slice = (datos[i][1] / total) * Math.PI * 2;
-    ctx.beginPath(); ctx.arc(cx, cy, radio, angulo, angulo + slice);
-    ctx.strokeStyle = cat.color; ctx.lineWidth = grosor; ctx.lineCap = "butt"; ctx.stroke();
-    angulo += slice;
+
+  var max = Math.max.apply(null, datos) || 1;
+  var w   = canvas.width;
+  var h   = canvas.height;
+  var barW = w / 12 - 4;
+
+  for (var m = 0; m < 12; m++) {
+    var barH  = (datos[m] / max) * (h - 30);
+    var x     = m * (w / 12) + 2;
+    var y     = h - barH - 20;
+    var activo = m === hoy.getMonth();
+
+    ctx.fillStyle = activo ? "#6366F1" : "rgba(99,102,241,0.3)";
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, barW, barH, 4) : ctx.rect(x, y, barW, barH);
+    ctx.fill();
+
+    ctx.fillStyle = activo ? "white" : "rgba(255,255,255,0.3)";
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(meses[m], x + barW / 2, h - 4);
   }
-  ctx.beginPath(); ctx.arc(cx, cy, radio - grosor / 2, 0, Math.PI * 2);
-  ctx.fillStyle = "#0D0D1A"; ctx.fill();
 }
+
+// EXPORTAR PDF
+function exportarPDF() {
+  var filtradas = filtrarTransacciones();
+  var ingresos = 0; var gastos = 0;
+  for (var i = 0; i < filtradas.length; i++) {
+    if (filtradas[i].type === "ingreso") ingresos += filtradas[i].monto;
+    else gastos += filtradas[i].monto;
+  }
+
+  var periodos = { semana: "Esta semana", mes: "Este mes", año: "Este año", todo: "Todo el historial" };
+  var contenido = "FinanzApp - Reporte " + periodos[filtroActivo] + "\n";
+  contenido += "================================\n";
+  contenido += "Ingresos: $" + ingresos.toLocaleString() + "\n";
+  contenido += "Gastos:   $" + gastos.toLocaleString() + "\n";
+  contenido += "Balance:  $" + (ingresos - gastos).toLocaleString() + "\n";
+  contenido += "================================\n\n";
+  contenido += "TRANSACCIONES\n";
+  for (var i = 0; i < filtradas.length; i++) {
+    var t = filtradas[i];
+    var signo = t.type === "ingreso" ? "+" : "-";
+    contenido += signo + "$" + t.monto.toLocaleString() + " | " + t.descripcion + " | " + t.categoria + " | " + t.fecha + "\n";
+  }
+
+  var blob = new Blob([contenido], { type: "text/plain" });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement("a");
+  a.href     = url;
+  a.download = "reporte-finanzapp-" + filtroActivo + ".txt";
+  a.click();
+  URL.revokeObjectURL(url);
+  mostrarToast("Reporte exportado");
+      }
 
 // NAVEGACION
 function mostrarPantalla(nombre) {
